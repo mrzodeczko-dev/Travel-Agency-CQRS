@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-availability-hotelId-index
+      author: rzodeczko-dev
+      comment: "Single-field index on daily_availability.hotelId — supports hotel-only queries without date range"
+      changes:
+        - createIndex:
+            collectionName: daily_availability
+            keys: '{ hotelId: 1 }'
+            options: '{ name: "availability_hotelId" }'

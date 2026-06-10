@@ -1,0 +1,263 @@
+services:
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # DATABASES
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  travel-agency-command-side-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - travel-agency-command-side-postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${TA_COMMAND_SIDE_SERVICE_DB_NAME}
+      POSTGRES_USER: ${TA_COMMAND_SIDE_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${TA_COMMAND_SIDE_SERVICE_DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      TZ: UTC
+    command:
+      - "postgres"
+      - "-c"
+      - "timezone=UTC"
+    ports:
+      - '${TA_COMMAND_SIDE_SERVICE_DB_PORT}:5432'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${TA_COMMAND_SIDE_SERVICE_DB_USER} -d ${TA_COMMAND_SIDE_SERVICE_DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - mr-network
+
+  mongodb:
+    image: mongo:8.3.1
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME}
+    ports:
+      - '${MONGO_PORT}:27017'
+    volumes:
+      - mongodb:/data/db
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - mr-network
+
+  liquibase-mongo:
+    build:
+      context: ./query-side-liquibase-mongo
+      dockerfile: Dockerfile-liquibase
+    container_name: liquibase-mongo
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command:
+      - --search-path=/liquibase/changelog
+      - --changelog-file=master.yaml
+      - --url=mongodb://mongodb:27017/${MONGO_DB_NAME}?authSource=admin
+      - --username=${MONGO_USER}
+      - --password=${MONGO_PASSWORD}
+      - --log-level=info
+      - update
+    networks:
+      - mr-network
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # KAFKA
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-single
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    env_file:
+      - .env
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "kafka-topics --bootstrap-server localhost:9092 --list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mr-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    container_name: schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8200:8200"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8200
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8200/subjects" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mr-network
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ "bash", "-c", "
+      echo 'Creating Kafka topics...' &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_BOOKINGS} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_AVAILABILITY} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic ${TOPIC_HOTELS} --partitions ${TOPIC_PARTITIONS:-3} --replication-factor ${TOPIC_REPLICAS:-1} &&
+      echo 'All topics created successfully'
+      " ]
+    restart: "no"
+    networks:
+      - mr-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:0.3.3
+    container_name: kafka-ui
+    ports:
+      - "8100:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=kraft-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_KAFKACONNECT_ENABLED=false
+      - KAFKA_CLUSTERS_0_SCHEMAREGISTRY=http://schema-registry:8200
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    networks:
+      - mr-network
+
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # APPLICATIONS
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  travel-agency-command-side:
+    image: mrzodeczko/travel-agency-command-side:latest
+    restart: on-failure:10
+    ports:
+      - "${TA_COMMAND_SIDE_SERVICE_PORT}:8080"
+    depends_on:
+      travel-agency-command-side-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      SPRING_APPLICATION_NAME: ${TA_COMMAND_SIDE_SERVICE_APPLICATION_NAME}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://travel-agency-command-side-postgres:5432/${TA_COMMAND_SIDE_SERVICE_DB_NAME}?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${TA_COMMAND_SIDE_SERVICE_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${TA_COMMAND_SIDE_SERVICE_DB_PASSWORD}
+      SERVER_PORT: ${TA_COMMAND_SIDE_SERVICE_PORT}
+      TOPIC_BOOKINGS: ${TOPIC_BOOKINGS}
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - mr-network
+
+  travel-agency-query-side:
+    image: mrzodeczko/travel-agency-query-side:latest
+    restart: on-failure:10
+    ports:
+      - "${QUERY_SIDE_SERVICE_PORT}:8081"
+    volumes:
+      - kafka-streams-state:/var/lib/travel-agency-query-side/kafka-streams
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      SERVER_PORT: ${QUERY_SIDE_SERVICE_PORT}
+      SPRING_APPLICATION_NAME: ${QUERY_SIDE_SERVICE_APPLICATION_NAME}
+      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@${MONGO_HOST}:27017/${MONGO_DB_NAME}?authSource=admin
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_SCHEMA_REGISTRY_URL: http://schema-registry:8200
+      DEFAULT_HOTEL_CAPACITY: ${QUERY_SIDE_DEFAULT_HOTEL_CAPACITY}
+      KAFKA_STREAMS_APPLICATION_ID: ${KAFKA_STREAMS_APPLICATION_ID}
+      KAFKA_STREAMS_THREADS: ${KAFKA_STREAMS_THREADS}
+      KAFKA_STREAMS_STATE_DIR: ${KAFKA_STREAMS_STATE_DIR}
+      KAFKA_PROJECTION_GROUP_ID: ${KAFKA_PROJECTION_GROUP_ID}
+      HOTELS_CONSUMER_GROUP: ${HOTELS_CONSUMER_GROUP}
+      TOPIC_BOOKINGS: ${TOPIC_BOOKINGS}
+      TOPIC_AVAILABILITY: ${TOPIC_AVAILABILITY}
+      TOPIC_AVAILABILITY_DLT: ${TOPIC_AVAILABILITY_DLT}
+      TOPIC_HOTELS: ${TOPIC_HOTELS}
+      TOPIC_HOTELS_DLT: ${TOPIC_HOTELS_DLT}
+      LAST_ROOMS_THRESHOLD: ${QUERY_SIDE_LAST_ROOMS_THRESHOLD}
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "1.0"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - mr-network
+
+volumes:
+  travel-agency-command-side-postgres:
+  mongodb:
+  kafka-data:
+  kafka-streams-state:
+
+networks:
+  mr-network:

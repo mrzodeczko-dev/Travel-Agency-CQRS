@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-availability-hotelId-date-compound-index
+      author: rzodeczko-dev
+      comment: "Compound unique index on availability(hotelId, date) — covers the primary query pattern"
+      changes:
+        - createIndex:
+            collectionName: availability
+            keys: '{ hotelId: 1, date: 1 }'
+            options: '{ unique: true, name: "availability_hotelId_date_unique" }'

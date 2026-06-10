@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-hotels-capacity-index
+      author: rzodeczko-dev
+      comment: "Index on hotels.capacity — supports capacity-based lookups"
+      changes:
+        - createIndex:
+            collectionName: hotels
+            keys: '{ capacity: 1 }'
+            options: '{ name: "hotels_capacity" }'

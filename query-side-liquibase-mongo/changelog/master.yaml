@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - include:
+      file: changes/001-availability-hotelId-date-compound-index.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/002-availability-hotelId-index.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/003-hotels-capacity-index.yaml
+      relativeToChangelogFile: true

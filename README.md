@@ -1,0 +1,362 @@
+# Travel Agency — CQRS (Orchestration)
+
+[![Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-black.svg)](https://kafka.apache.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8-green.svg)](https://www.mongodb.com/)
+[![Docker](https://img.shields.io/badge/Docker%20Compose-Ready-blue.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+<a id="toc"></a>
+## Table of Contents
+
+- [Overview](#overview)
+- [Related Repositories](#related-repositories)
+- [Architecture](#architecture)
+- [Getting Started](#getting-started)
+- [Services & Ports](#services-and-ports)
+- [API Endpoints](#api-endpoints)
+- [Kafka Topics](#kafka-topics)
+- [Environment Variables](#environment-variables)
+- [Postman Collection](#postman-collection)
+- [E2E Smoke Tests](#e2e-tests)
+- [Project Structure](#project-structure)
+- [Contact](#contact)
+
+---
+
+<a id="overview"></a>
+## Overview
+
+[↑ Back to top](#toc)
+
+This is the **orchestration repository** for a CQRS-based hotel booking platform. It does not contain application source code — instead it provides a single `docker-compose.yml` that pulls pre-built images from Docker Hub and wires together the full infrastructure: databases, Kafka cluster, Schema Registry, and both microservices.
+
+The system implements **Command Query Responsibility Segregation (CQRS)** with **Event-Driven Architecture**: the command side handles booking creation and cancellation (writes), publishes domain events to Kafka via the Transactional Outbox Pattern, and the query side consumes those events through Kafka Streams to build a denormalized availability read model in MongoDB.
+
+---
+
+<a id="related-repositories"></a>
+## Related Repositories
+
+[↑ Back to top](#toc)
+
+| Service | Description | Repository |
+|---------|-------------|------------|
+| **Command Side** | Write model — booking creation & cancellation, Transactional Outbox, Kafka producer | [Travel-Agency-Command-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Command-Side-CQRS-Write-Model-) |
+| **Query Side** | Read model — Kafka Streams aggregation, MongoDB projections, availability REST API | [Travel-Agency-Query-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS) |
+
+---
+
+<a id="architecture"></a>
+## Architecture
+
+[↑ Back to top](#toc)
+
+```mermaid
+flowchart LR
+    subgraph cmd["Command Side :8080"]
+        API_C["REST API\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
+        PG[("PostgreSQL")]
+        OB["Outbox Scheduler"]
+    end
+
+    subgraph kafka["Kafka (KRaft)"]
+        TB(["travel.bookings"])
+        TA(["travel.availability"])
+        TH(["travel.hotels"])
+        SR["Schema Registry\nAvro"]
+    end
+
+    subgraph query["Query Side :8081"]
+        KS["Kafka Streams\nBookingStreamsTopology"]
+        APL["AvailabilityProjectionListener"]
+        HCL["HotelCapacityListener"]
+        API_Q["REST API\nGET /api/availability/{hotelId}"]
+        MDB[("MongoDB")]
+    end
+
+    API_C --> PG
+    PG --> OB
+    OB -->|BookingEventAvro| TB
+    TB --> KS
+    KS -->|AvailabilityUpdated| TA
+    TA --> APL --> MDB
+    TH --> HCL --> MDB
+    MDB --> API_Q
+    SR -.->|schema validation| TB
+    SR -.->|schema validation| TA
+```
+
+**Data flow:**
+
+1. Client sends a booking command (`POST` or `DELETE`) to the Command Side
+2. Command Side persists the booking in PostgreSQL and saves an outbox entry in the same transaction (Transactional Outbox Pattern)
+3. Outbox Scheduler polls and publishes `BookingEventAvro` events (with `EventType`: `BookingCreated` / `BookingCancelled`) to the `travel.bookings` Kafka topic
+4. Query Side's Kafka Streams topology consumes booking events, computes per-hotel per-day occupancy deltas, and emits `AvailabilityUpdated` events to the `travel.availability` topic
+5. Availability Projection Listener upserts the read model in MongoDB with current occupancy, capacity, and availability status (`AVAILABLE` / `LAST_ROOMS` / `SOLD_OUT`)
+6. Client queries availability via the Query Side REST API, which reads directly from MongoDB
+
+---
+
+<a id="getting-started"></a>
+## Getting Started
+
+[↑ Back to top](#toc)
+
+### Prerequisites
+
+- Docker and Docker Compose v2+
+- Application images available on Docker Hub:
+  - `mrzodeczko/travel-agency-command-side`
+  - `mrzodeczko/travel-agency-query-side`
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/mrzodeczko-dev/Travel-Agency-CQRS.git
+cd Travel-Agency-CQRS
+cp .env.example .env
+```
+
+Edit `.env` to set your own passwords if needed. The defaults are suitable for local development only.
+
+### 2. Start the stack
+
+```bash
+docker compose up -d --build
+```
+
+All services start in dependency order via healthchecks — databases and Kafka must be healthy before the applications launch. The `kafka-init` container creates the required topics and exits.
+
+### 3. Verify
+
+```bash
+# Command Side health
+curl http://localhost:8080/actuator/health
+
+# Query Side health
+curl http://localhost:8081/actuator/health
+```
+
+### 4. Stop
+
+```bash
+docker compose down          # stop containers, keep volumes
+docker compose down -v       # stop containers, remove volumes (clean state)
+```
+
+---
+
+<a id="services-and-ports"></a>
+## Services & Ports
+
+[↑ Back to top](#toc)
+
+| Service | Container | Port | Description |
+|---------|-----------|------|-------------|
+| Command Side API | `travel-agency-command-side` | `8080` | Booking creation and cancellation |
+| Query Side API | `travel-agency-query-side` | `8081` | Availability queries |
+| PostgreSQL | `travel-agency-command-side-postgres` | `5432` | Command side database |
+| MongoDB | `mongodb` | `27017` | Query side read model |
+| Kafka Broker | `kafka-single` | `9092` | Event streaming (KRaft mode) |
+| Schema Registry | `schema-registry` | `8200` | Avro schema management |
+| Kafka UI | `kafka-ui` | `8100` | Web interface for Kafka monitoring |
+| Liquibase (MongoDB) | `liquibase-mongo` | — | Runs MongoDB migrations and exits |
+| Kafka Init | `kafka-init` | — | Creates Kafka topics and exits |
+
+---
+
+<a id="api-endpoints"></a>
+## API Endpoints
+
+[↑ Back to top](#toc)
+
+### Command Side (`:8080`)
+
+| Method | Path | Description | Request Body | Success | Errors |
+|--------|------|-------------|--------------|---------|--------|
+| `POST` | `/api/bookings` | Create a booking | `{ hotelId, userId, start, end }` | `201 Created` | `400`, `409` |
+| `DELETE` | `/api/bookings/{id}` | Cancel a booking | — | `204 No Content` | `404`, `409` |
+
+### Query Side (`:8081`)
+
+| Method | Path | Description | Query Params | Success | Errors |
+|--------|------|-------------|--------------|---------|--------|
+| `GET` | `/api/availability/{hotelId}` | Get hotel availability | `from`, `to` (ISO dates, optional) | `200 OK` | `400` |
+
+### cURL examples
+
+```bash
+# Create a booking
+curl -X POST http://localhost:8080/api/bookings \
+  -H "Content-Type: application/json" \
+  -d '{"hotelId": 1, "userId": 1, "start": "2026-08-01", "end": "2026-08-07"}'
+
+# Check availability
+curl "http://localhost:8081/api/availability/1?from=2026-08-01&to=2026-08-07"
+
+# Cancel a booking
+curl -X DELETE http://localhost:8080/api/bookings/1
+```
+
+---
+
+<a id="kafka-topics"></a>
+## Kafka Topics
+
+[↑ Back to top](#toc)
+
+All topics are created automatically by the `kafka-init` container on startup.
+
+| Topic | Schema | Description |
+|-------|--------|-------------|
+| `travel.bookings` | `BookingEventAvro` | Booking events with `EventType` enum (`BookingCreated` / `BookingCancelled`) |
+| `travel.availability` | `AvailabilityUpdated` | Aggregated per-hotel per-day occupancy (output of Kafka Streams) |
+| `travel.hotels` | `HotelUpserted` | Hotel capacity changes |
+
+---
+
+<a id="environment-variables"></a>
+## Environment Variables
+
+[↑ Back to top](#toc)
+
+Copy `.env.example` to `.env` and adjust as needed. All variables are documented in the example file.
+
+### PostgreSQL (Command Side)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TA_COMMAND_SIDE_SERVICE_DB_PORT` | Host port for PostgreSQL | `5432` |
+| `TA_COMMAND_SIDE_SERVICE_DB_NAME` | Database name | `travels_db` |
+| `TA_COMMAND_SIDE_SERVICE_DB_USER` | DB user | `user` |
+| `TA_COMMAND_SIDE_SERVICE_DB_PASSWORD` | DB password | `changeme` |
+
+### MongoDB (Query Side)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MONGO_PORT` | Host port for MongoDB | `27017` |
+| `MONGO_DB_NAME` | Database name | `travels_read_db` |
+| `MONGO_USER` | DB user | `user` |
+| `MONGO_PASSWORD` | DB password | `changeme` |
+
+### Applications
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TA_COMMAND_SIDE_SERVICE_PORT` | Command Side HTTP port | `8080` |
+| `QUERY_SIDE_SERVICE_PORT` | Query Side HTTP port | `8081` |
+| `QUERY_SIDE_DEFAULT_HOTEL_CAPACITY` | Fallback hotel capacity | `100` |
+| `QUERY_SIDE_LAST_ROOMS_THRESHOLD` | Fraction triggering `LAST_ROOMS` status | `0.9` |
+
+### Kafka
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLUSTER_ID` | KRaft cluster ID | `MkU3OEVBNTcwNTJENDM2Qk` |
+| `TOPIC_BOOKINGS` | Bookings topic name | `travel.bookings` |
+| `TOPIC_AVAILABILITY` | Availability topic name | `travel.availability` |
+| `TOPIC_HOTELS` | Hotels topic name | `travel.hotels` |
+| `TOPIC_PARTITIONS` | Default partition count | `3` |
+| `TOPIC_REPLICAS` | Replication factor | `1` |
+
+---
+
+<a id="postman-collection"></a>
+## Postman Collection
+
+[↑ Back to top](#toc)
+
+A ready-to-use Postman collection is included in `postman/Travel-Agency-CQRS.postman_collection.json` covering the full booking flow:
+
+1. **Create Booking** — `POST /api/bookings` (Command Side)
+2. **Cancel Booking** — `DELETE /api/bookings/{id}` (Command Side)
+3. **Get Availability** — `GET /api/availability/{hotelId}` (Query Side)
+
+Import via **File → Import** in Postman.
+
+---
+
+<a id="e2e-tests"></a>
+## E2E Smoke Tests
+
+[↑ Back to top](#toc)
+
+The `e2e/` directory is a standalone Maven project with JUnit 5 + RestAssured + Awaitility tests that run against the live stack. They verify the full CQRS pipeline end-to-end — no application source code needed.
+
+### What is tested
+
+| Test class | Scenarios |
+|------------|-----------|
+| `HealthCheckTest` | Both services respond `200` on `/actuator/health` |
+| `BookingFlowTest` | Create booking (`201`), availability projection appears on query side, cancel (`204`), double cancel (`409`), occupancy decreases after cancellation, input validation (`400`, `404`), paged response shape |
+
+Availability assertions use Awaitility polling with a configurable timeout (default 30 s) to account for the asynchronous Kafka event pipeline.
+
+### Running the tests
+
+```bash
+# 1. Start the full stack
+docker compose up -d
+
+# 2. Run tests
+cd e2e
+mvn test
+```
+
+### Configuration
+
+| Environment Variable | System Property | Description | Default |
+|---------------------|-----------------|-------------|---------|
+| `COMMAND_SIDE_URL` | `command.side.url` | Base URL of the command side | `http://localhost:8080` |
+| `QUERY_SIDE_URL` | `query.side.url` | Base URL of the query side | `http://localhost:8081` |
+| `E2E_PROPAGATION_TIMEOUT` | `e2e.propagation.timeout` | Max seconds to wait for event propagation | `30` |
+
+```bash
+# Example: custom URLs
+mvn test -Dcommand.side.url=http://myhost:8080 -Dquery.side.url=http://myhost:8081
+```
+
+---
+
+<a id="project-structure"></a>
+## Project Structure
+
+[↑ Back to top](#toc)
+
+```
+Travel-Agency-CQRS/
+├── docker-compose.yml                                  # Full stack orchestration
+├── .env.example                                        # Environment template (safe to commit)
+├── .gitignore
+├── query-side-liquibase-mongo/                         # MongoDB migrations for the Query Side
+│   ├── Dockerfile-liquibase
+│   ├── liquibase-deps.pom.xml
+│   └── changelog/
+│       ├── master.yaml
+│       └── changes/
+│           ├── 001-availability-hotelId-date-compound-index.yaml
+│           ├── 002-availability-hotelId-index.yaml
+│           └── 003-hotels-capacity-index.yaml
+├── e2e/                                                # E2E smoke tests (Java / JUnit 5)
+│   ├── pom.xml                                         # Standalone Maven project
+│   └── src/test/java/com/rzodeczko/e2e/
+│       ├── E2EConfig.java                              # Shared configuration
+│       ├── HealthCheckTest.java                        # Health check tests
+│       └── BookingFlowTest.java                        # Full CQRS flow tests
+├── postman/                                            # Postman collection
+│   └── Travel-Agency-CQRS.postman_collection.json
+├── LICENSE
+└── README.md
+```
+
+---
+
+<a id="contact"></a>
+## Contact
+
+[↑ Back to top](#toc)
+
+Designed and implemented by **Michał Rzodeczko**.  
+Other projects: [github.com/mrzodeczko-dev](https://github.com/mrzodeczko-dev)

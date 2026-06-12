@@ -83,15 +83,15 @@ flowchart TB
         API_Q["REST API\nGET /api/availability/{hotelId}\nGET /api/hotels/{hotelId}"]
     end
 
-    API_C --> PG
-    PG --> OB
-    OB -->|BookingEventAvro| TB
-    OB -->|HotelUpsertedAvro| TH
-    TB --> KS
-    KS -->|AvailabilityUpdated| TA
-    TA --> APL --> MDB
-    TH --> HCL --> MDB
-    MDB --> API_Q
+    API_C ==> PG
+    PG ==> OB
+    OB ==>|BookingEventAvro| TB
+    OB ==>|HotelUpsertedAvro| TH
+    TB ==> KS
+    KS ==>|AvailabilityUpdated| TA
+    TA ==> APL ==> MDB
+    TH ==> HCL ==> MDB
+    MDB ==> API_Q
     SR -.->|schema validation| TB
     SR -.->|schema validation| TA
     SR -.->|schema validation| TH
@@ -99,6 +99,9 @@ flowchart TB
     style cmd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
     style kafka fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#bf360c
     style query fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+
+    linkStyle 0,1,2,3,4,5,6,7,8,9,10 stroke:#333,stroke-width:2.5px
+    linkStyle 11,12,13 stroke:#999,stroke-width:1.5px,stroke-dasharray:5
 ```
 
 **Data flow:**

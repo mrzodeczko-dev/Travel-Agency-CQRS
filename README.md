@@ -414,8 +414,7 @@ Travel-Agency-CQRS/
 │   │   └── provisioning/
 │   │       ├── dashboards/dashboards.yml
 │   │       └── datasources/datasources.yml
-│   ├── prometheus/prometheus.yml
-│   └── tempo/tempo.yml
+│   └── prometheus/prometheus.yml
 ├── e2e/                                                # E2E smoke tests (Java / JUnit 5)
 │   ├── pom.xml                                         # Standalone Maven project
 │   └── src/test/java/com/rzodeczko/e2e/

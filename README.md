@@ -18,11 +18,11 @@
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
 - [Services & Ports](#services-and-ports)
+- [Swagger UI](#swagger-ui)
 - [Observability](#observability)
 - [API Endpoints](#api-endpoints)
 - [Kafka Topics](#kafka-topics)
 - [Environment Variables](#environment-variables)
-- [Postman Collection](#postman-collection)
 - [E2E Smoke Tests](#e2e-tests)
 - [Project Structure](#project-structure)
 - [Contact](#contact)
@@ -175,6 +175,24 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 
 ---
 
+<a id="swagger-ui"></a>
+## Swagger UI
+
+[↑ Back to top](#toc)
+
+Both services expose interactive API documentation via springdoc-openapi. Swagger UI is controlled by the `SPRINGDOC_ENABLED` variable in the `.env` file (created from `.env.example`). Set it to `true` to enable:
+
+```properties
+SPRINGDOC_ENABLED=true
+```
+
+| Service | URL |
+|---------|-----|
+| Command Side | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
+| Query Side | [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html) |
+
+---
+
 <a id="observability"></a>
 ## Observability
 
@@ -232,13 +250,6 @@ All dashboards are provisioned automatically from `observability/grafana/dashboa
 |--------|------|-------------|--------------|---------|--------|
 | `GET` | `/api/availability/{hotelId}` | Get hotel availability | `from`, `to` (ISO dates, optional) | `200 OK` | `400` |
 | `GET` | `/api/hotels/{hotelId}` | Get hotel capacity | - | `200 OK` | `404` |
-
-### Swagger UI
-
-Both services expose interactive API documentation via springdoc-openapi:
-
-- Command Side: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-- Query Side: [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html)
 
 ### cURL examples
 
@@ -324,24 +335,6 @@ Copy `.env.example` to `.env` and adjust as needed. All variables are documented
 
 ---
 
-<a id="postman-collection"></a>
-## Postman Collection
-
-[↑ Back to top](#toc)
-
-A ready-to-use Postman collection is included in `postman/Travel-Agency-CQRS.postman_collection.json` covering the full booking flow:
-
-1. **Create Hotel** - `POST /api/hotels` (Command Side)
-2. **Update Hotel Capacity** - `PUT /api/hotels/{id}` (Command Side)
-3. **Create Booking** - `POST /api/bookings` (Command Side)
-4. **Cancel Booking** - `DELETE /api/bookings/{id}` (Command Side)
-5. **Get Hotel Capacity** - `GET /api/hotels/{hotelId}` (Query Side)
-6. **Get Availability** - `GET /api/availability/{hotelId}` (Query Side)
-
-Import via **File → Import** in Postman.
-
----
-
 <a id="e2e-tests"></a>
 ## E2E Smoke Tests
 
@@ -349,7 +342,7 @@ Import via **File → Import** in Postman.
 
 The `e2e/` directory is a standalone Maven project with JUnit 5 + RestAssured + Awaitility tests that run against the live stack. They verify the full CQRS pipeline end-to-end - no application source code needed.
 
-Test data is managed automatically: `HotelSeeder` creates hotels via the command side REST API (`POST /api/hotels`) and waits for them to propagate to the query side, exercising the full CQRS pipeline. `DatabaseCleaner` truncates PostgreSQL tables, restarts sequences, and drops MongoDB collections after each test run. Database credentials are read from the project's `.env` file.
+Test data is managed automatically: `HotelSeeder` creates hotels via the command side REST API (`POST /api/hotels`) and waits for them to propagate to the query side, exercising the full CQRS pipeline.
 
 ### What is tested
 
@@ -428,11 +421,8 @@ Travel-Agency-CQRS/
 │   └── src/test/java/com/rzodeczko/e2e/
 │       ├── E2EConfig.java                              # Shared configuration
 │       ├── HotelSeeder.java                            # Seeds hotels via REST API (full CQRS flow)
-│       ├── DatabaseCleaner.java                        # Truncates PostgreSQL + drops MongoDB collections
 │       ├── HealthCheckTest.java                        # Health check tests
 │       └── BookingFlowTest.java                        # Full CQRS flow tests
-├── postman/                                            # Postman collection
-│   └── Travel-Agency-CQRS.postman_collection.json
 ├── LICENSE
 └── README.md
 ```

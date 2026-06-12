@@ -284,7 +284,7 @@ All topics are created automatically by the `kafka-init` container on startup.
 |-------|--------|-------------|
 | `travel.bookings` | `BookingEventAvro` | Booking events with `EventType` enum (`BookingCreated` / `BookingCancelled`) |
 | `travel.availability` | `AvailabilityUpdated` | Aggregated per-hotel per-day occupancy (output of Kafka Streams) |
-| `travel.hotels` | `HotelUpserted` | Hotel capacity changes |
+| `travel.hotels` | `HotelUpserted` | Hotel capacity changes (`cleanup.policy=compact`) |
 
 ---
 

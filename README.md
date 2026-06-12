@@ -61,9 +61,10 @@ The system implements **Command Query Responsibility Segregation (CQRS)** with *
 flowchart TB
     subgraph cmd["Command Side :8080"]
         direction LR
-        API_C["REST API\nPOST/PUT /api/hotels\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
+        API_C["REST API\nPOST/PATCH /api/hotels\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
         PG[("PostgreSQL")]
-        OB["Outbox Scheduler"]
+        OB_B["BookingOutboxScheduler"]
+        OB_H["HotelOutboxScheduler"]
     end
 
     subgraph kafka["Kafka · KRaft"]
@@ -72,6 +73,8 @@ flowchart TB
         TB(["travel.bookings"])
         TA(["travel.availability"])
         TH(["travel.hotels"])
+        DLT_A(["travel.availability.DLT"])
+        DLT_H(["travel.hotels.DLT"])
     end
 
     subgraph query["Query Side :8081"]
@@ -84,14 +87,17 @@ flowchart TB
     end
 
     API_C ==> PG
-    PG ==> OB
-    OB ==>|BookingEventAvro| TB
-    OB ==>|HotelUpsertedAvro| TH
+    PG ==> OB_B
+    PG ==> OB_H
+    OB_B ==>|BookingEventAvro| TB
+    OB_H ==>|HotelUpsertedAvro| TH
     TB ==> KS
     KS ==>|AvailabilityUpdated| TA
     TA ==> APL ==> MDB
     TH ==> HCL ==> MDB
     MDB ==> API_Q
+    APL -.->|failed| DLT_A
+    HCL -.->|failed| DLT_H
     SR -.->|schema validation| TB
     SR -.->|schema validation| TA
     SR -.->|schema validation| TH
@@ -99,9 +105,12 @@ flowchart TB
     style cmd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
     style kafka fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#bf360c
     style query fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    style DLT_A fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    style DLT_H fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c
 
-    linkStyle 0,1,2,3,4,5,6,7,8,9,10 stroke:#333,stroke-width:2.5px
-    linkStyle 11,12,13 stroke:#999,stroke-width:1.5px,stroke-dasharray:5
+    linkStyle 0,1,2,3,4,5,6,7,8,9,10,11 stroke:#333,stroke-width:2.5px
+    linkStyle 12,13 stroke:#c62828,stroke-width:1.5px,stroke-dasharray:5
+    linkStyle 14,15,16 stroke:#999,stroke-width:1.5px,stroke-dasharray:5
 ```
 
 **Data flow:**
@@ -251,7 +260,7 @@ All dashboards are provisioned automatically from `observability/grafana/dashboa
 | Method | Path | Description | Request Body | Success | Errors |
 |--------|------|-------------|--------------|---------|--------|
 | `POST` | `/api/hotels` | Create a hotel | `{ capacity }` | `201 Created` | `400` |
-| `PUT` | `/api/hotels/{id}` | Update hotel capacity | `{ capacity }` | `200 OK` | `400` |
+| `PATCH` | `/api/hotels/{id}` | Update hotel capacity | `{ capacity }` | `200 OK` | `400` |
 | `POST` | `/api/bookings` | Create a booking | `{ hotelId, userId, start, end }` | `201 Created` | `400`, `409` |
 | `DELETE` | `/api/bookings/{id}` | Cancel a booking | - | `204 No Content` | `404`, `409` |
 

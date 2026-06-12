@@ -1,4 +1,4 @@
-# Travel Agency — CQRS (Orchestration)
+# Travel Agency - CQRS (Orchestration)
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.6-6DB33F.svg)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00.svg)](https://openjdk.org/)
@@ -34,7 +34,7 @@
 
 [↑ Back to top](#toc)
 
-This is the **orchestration repository** for a CQRS-based hotel booking platform. It does not contain application source code — instead it provides a single `docker-compose.yml` that pulls pre-built images from Docker Hub and wires together the full infrastructure: databases, Kafka cluster, Schema Registry, and both microservices.
+This is the **orchestration repository** for a CQRS-based hotel booking platform. It does not contain application source code - instead it provides a single `docker-compose.yml` that pulls pre-built images from Docker Hub and wires together the full infrastructure: databases, Kafka cluster, Schema Registry, and both microservices.
 
 The system implements **Command Query Responsibility Segregation (CQRS)** with **Event-Driven Architecture**: the command side handles booking creation and cancellation (writes), publishes domain events to Kafka via the Transactional Outbox Pattern, and the query side consumes those events through Kafka Streams to build a denormalized availability read model in MongoDB.
 
@@ -47,8 +47,8 @@ The system implements **Command Query Responsibility Segregation (CQRS)** with *
 
 | Service | Description | Repository |
 |---------|-------------|------------|
-| **Command Side** | Write model — booking creation & cancellation, Transactional Outbox, Kafka producer | [Travel-Agency-Command-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Command-Side-CQRS-Write-Model-) |
-| **Query Side** | Read model — Kafka Streams aggregation, MongoDB projections, availability REST API | [Travel-Agency-Query-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS) |
+| **Command Side** | Write model - booking creation & cancellation, Transactional Outbox, Kafka producer | [Travel-Agency-Command-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Command-Side-CQRS-Write-Model-) |
+| **Query Side** | Read model - Kafka Streams aggregation, MongoDB projections, availability REST API | [Travel-Agency-Query-Side-CQRS](https://github.com/mrzodeczko-dev/Travel-Agency-Query-Side-CQRS) |
 
 ---
 
@@ -133,7 +133,7 @@ Edit `.env` to set your own passwords if needed. The defaults are suitable for l
 docker compose up -d --build
 ```
 
-All services start in dependency order via healthchecks — databases and Kafka must be healthy before the applications launch. The `kafka-init` container creates the required topics and exits.
+All services start in dependency order via healthchecks - databases and Kafka must be healthy before the applications launch. The `kafka-init` container creates the required topics and exits.
 
 ### 3. Verify
 
@@ -168,8 +168,8 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 | Kafka Broker | `kafka-single` | `9092` | Event streaming (KRaft mode) |
 | Schema Registry | `schema-registry` | `8200` | Avro schema management |
 | Kafka UI | `kafka-ui` | `8100` | Web interface for Kafka monitoring |
-| Liquibase (MongoDB) | `liquibase-mongo` | — | Runs MongoDB migrations and exits |
-| Kafka Init | `kafka-init` | — | Creates Kafka topics and exits |
+| Liquibase (MongoDB) | `liquibase-mongo` | - | Runs MongoDB migrations and exits |
+| Kafka Init | `kafka-init` | - | Creates Kafka topics and exits |
 | Prometheus | `prometheus` | `9090` | Metrics collection and storage |
 | Grafana | `grafana` | `3000` | Dashboards and observability UI |
 
@@ -182,7 +182,7 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 
 The stack includes **Prometheus** for metrics scraping and **Grafana** for dashboards and visualization.
 
-Grafana starts with anonymous access enabled (Viewer role) — no login required to browse dashboards. Admin credentials: `admin` / `admin`.
+Grafana starts with anonymous access enabled (Viewer role) - no login required to browse dashboards. Admin credentials: `admin` / `admin`.
 
 ### Grafana Dashboards
 
@@ -208,7 +208,7 @@ All dashboards are provisioned automatically from `observability/grafana/dashboa
 
 ### Other UIs
 
-- **Prometheus**: [http://localhost:9090](http://localhost:9090) — raw metrics, PromQL queries
+- **Prometheus**: [http://localhost:9090](http://localhost:9090) - raw metrics, PromQL queries
 
 ---
 
@@ -224,14 +224,14 @@ All dashboards are provisioned automatically from `observability/grafana/dashboa
 | `POST` | `/api/hotels` | Create a hotel | `{ capacity }` | `201 Created` | `400` |
 | `PUT` | `/api/hotels/{id}` | Update hotel capacity | `{ capacity }` | `200 OK` | `400` |
 | `POST` | `/api/bookings` | Create a booking | `{ hotelId, userId, start, end }` | `201 Created` | `400`, `409` |
-| `DELETE` | `/api/bookings/{id}` | Cancel a booking | — | `204 No Content` | `404`, `409` |
+| `DELETE` | `/api/bookings/{id}` | Cancel a booking | - | `204 No Content` | `404`, `409` |
 
 ### Query Side (`:8081`)
 
 | Method | Path | Description | Query Params | Success | Errors |
 |--------|------|-------------|--------------|---------|--------|
 | `GET` | `/api/availability/{hotelId}` | Get hotel availability | `from`, `to` (ISO dates, optional) | `200 OK` | `400` |
-| `GET` | `/api/hotels/{hotelId}` | Get hotel capacity | — | `200 OK` | `404` |
+| `GET` | `/api/hotels/{hotelId}` | Get hotel capacity | - | `200 OK` | `404` |
 
 ### Swagger UI
 
@@ -331,12 +331,12 @@ Copy `.env.example` to `.env` and adjust as needed. All variables are documented
 
 A ready-to-use Postman collection is included in `postman/Travel-Agency-CQRS.postman_collection.json` covering the full booking flow:
 
-1. **Create Hotel** — `POST /api/hotels` (Command Side)
-2. **Update Hotel Capacity** — `PUT /api/hotels/{id}` (Command Side)
-3. **Create Booking** — `POST /api/bookings` (Command Side)
-4. **Cancel Booking** — `DELETE /api/bookings/{id}` (Command Side)
-5. **Get Hotel Capacity** — `GET /api/hotels/{hotelId}` (Query Side)
-6. **Get Availability** — `GET /api/availability/{hotelId}` (Query Side)
+1. **Create Hotel** - `POST /api/hotels` (Command Side)
+2. **Update Hotel Capacity** - `PUT /api/hotels/{id}` (Command Side)
+3. **Create Booking** - `POST /api/bookings` (Command Side)
+4. **Cancel Booking** - `DELETE /api/bookings/{id}` (Command Side)
+5. **Get Hotel Capacity** - `GET /api/hotels/{hotelId}` (Query Side)
+6. **Get Availability** - `GET /api/availability/{hotelId}` (Query Side)
 
 Import via **File → Import** in Postman.
 
@@ -347,7 +347,7 @@ Import via **File → Import** in Postman.
 
 [↑ Back to top](#toc)
 
-The `e2e/` directory is a standalone Maven project with JUnit 5 + RestAssured + Awaitility tests that run against the live stack. They verify the full CQRS pipeline end-to-end — no application source code needed.
+The `e2e/` directory is a standalone Maven project with JUnit 5 + RestAssured + Awaitility tests that run against the live stack. They verify the full CQRS pipeline end-to-end - no application source code needed.
 
 Test data is managed automatically: `HotelSeeder` creates hotels via the command side REST API (`POST /api/hotels`) and waits for them to propagate to the query side, exercising the full CQRS pipeline. `DatabaseCleaner` truncates PostgreSQL tables, restarts sequences, and drops MongoDB collections after each test run. Database credentials are read from the project's `.env` file.
 

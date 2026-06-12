@@ -127,7 +127,7 @@
       }
     },
     {
-      "title": "Hotels — Totals",
+      "title": "Hotels -Totals",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
       "targets": [
@@ -152,7 +152,7 @@
       }
     },
     {
-      "title": "Hotels — Failure Totals",
+      "title": "Hotels -Failure Totals",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
       "targets": [
@@ -194,6 +194,6 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "title": "Travel Agency — Hotels Service",
+  "title": "Travel Agency -Hotels Service",
   "uid": "hotels-service"
 }

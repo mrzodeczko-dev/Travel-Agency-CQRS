@@ -114,7 +114,7 @@
       }
     },
     {
-      "title": "Bookings — Totals",
+      "title": "Bookings -Totals",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
       "targets": [
@@ -139,7 +139,7 @@
       }
     },
     {
-      "title": "Bookings — Failure Totals",
+      "title": "Bookings -Failure Totals",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
       "targets": [
@@ -176,6 +176,6 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "title": "Travel Agency — Booking Service",
+  "title": "Travel Agency -Booking Service",
   "uid": "booking-service"
 }

@@ -82,6 +82,6 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "title": "Query Side — Kafka Messaging",
+  "title": "Query Side -Kafka Messaging",
   "uid": "kafka-messaging-query-side"
 }

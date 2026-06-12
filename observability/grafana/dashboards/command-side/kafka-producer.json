@@ -202,6 +202,6 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "title": "Travel Agency — Kafka & Outbox",
+  "title": "Travel Agency -Kafka & Outbox",
   "uid": "kafka-producer"
 }

@@ -169,7 +169,7 @@
       }
     },
     {
-      "title": "HTTP Latency (p50 / p95 / p99) — All /api",
+      "title": "HTTP Latency (p50 / p95 / p99) -All /api",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "targets": [

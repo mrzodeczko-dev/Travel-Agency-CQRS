@@ -7,7 +7,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 
 /**
- * Smoke tests — verify both services are up and responding.
+ * Smoke tests -verify both services are up and responding.
  */
 class HealthCheckTest {
 

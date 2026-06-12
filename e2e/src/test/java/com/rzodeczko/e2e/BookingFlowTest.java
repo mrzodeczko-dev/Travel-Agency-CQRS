@@ -12,7 +12,7 @@ import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.*;
 
 /**
- * E2E smoke tests — full CQRS booking flow.
+ * E2E smoke tests -full CQRS booking flow.
  * <p>
  * Tests run against the live stack ({@code docker compose up}).
  * The flow exercises the entire event pipeline:
@@ -134,7 +134,7 @@ public class BookingFlowTest {
                 .then()
                 .statusCode(204);
 
-        // Second cancel — conflict
+        // Second cancel -conflict
         given()
                 .baseUri(E2EConfig.COMMAND_SIDE_URL)
                 .when()

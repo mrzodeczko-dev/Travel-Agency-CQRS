@@ -7,7 +7,7 @@
     <groupId>com.rzodeczko</groupId>
     <artifactId>travel-agency-cqrs-e2e</artifactId>
     <version>1.0.0</version>
-    <name>Travel Agency CQRS — E2E Tests</name>
+    <name>Travel Agency CQRS - E2E Tests</name>
     <description>End-to-end tests for the full CQRS stack (run against live docker compose)</description>
 
     <properties>

@@ -28,7 +28,7 @@
       }
     },
     {
-      "title": "Request Duration by Endpoint (p95) — click data point to view trace",
+      "title": "Request Duration by Endpoint (p95) -click data point to view trace",
       "type": "timeseries",
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
       "targets": [

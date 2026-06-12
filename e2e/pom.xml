@@ -7,8 +7,8 @@
     <groupId>com.rzodeczko</groupId>
     <artifactId>travel-agency-cqrs-e2e</artifactId>
     <version>1.0.0</version>
-    <name>Travel Agency CQRS — E2E Smoke Tests</name>
-    <description>End-to-end smoke tests for the full CQRS stack (run against live docker compose)</description>
+    <name>Travel Agency CQRS — E2E Tests</name>
+    <description>End-to-end tests for the full CQRS stack (run against live docker compose)</description>
 
     <properties>
         <java.version>25</java.version>
@@ -59,9 +59,10 @@
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
-            <version>5.3.1</version>
+            <version>5.4.0</version>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <build>
@@ -75,6 +76,14 @@
                         <command.side.url>${env.COMMAND_SIDE_URL}</command.side.url>
                         <query.side.url>${env.QUERY_SIDE_URL}</query.side.url>
                         <e2e.propagation.timeout>${env.E2E_PROPAGATION_TIMEOUT}</e2e.propagation.timeout>
+                        <db.pg.port>${env.TA_COMMAND_SIDE_SERVICE_DB_PORT}</db.pg.port>
+                        <db.pg.name>${env.TA_COMMAND_SIDE_SERVICE_DB_NAME}</db.pg.name>
+                        <db.pg.user>${env.TA_COMMAND_SIDE_SERVICE_DB_USER}</db.pg.user>
+                        <db.pg.password>${env.TA_COMMAND_SIDE_SERVICE_DB_PASSWORD}</db.pg.password>
+                        <db.mongo.port>${env.MONGO_PORT}</db.mongo.port>
+                        <db.mongo.user>${env.MONGO_USER}</db.mongo.user>
+                        <db.mongo.password>${env.MONGO_PASSWORD}</db.mongo.password>
+                        <db.mongo.name>${env.MONGO_DB_NAME}</db.mongo.name>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

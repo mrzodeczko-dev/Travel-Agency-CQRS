@@ -1,0 +1,87 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Kafka Consumer Lag per topic partition",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "max(kafka_consumer_fetch_manager_records_lag_max{application=\"travel-agency-query-side\", topic=~\".*\\\\..*\"}) by (topic,partition)",
+          "legendFormat": "{{topic}}-{{partition}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "spanNulls": true }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Kafka Consumer Throughput (records/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(kafka_consumer_fetch_manager_records_consumed_total{application=\"travel-agency-query-side\", topic=~\".*\\\\..*\"}[1m])) by (topic)",
+          "legendFormat": "{{topic}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "spanNulls": true },
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "DLT Messages (Dead Letter Topic)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(kafka_consumer_fetch_manager_records_consumed_total{application=\"travel-agency-query-side\", topic=~\".*DLT.*|.*dlt.*\"}[1m])) by (topic)",
+          "legendFormat": "consumed ← {{topic}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        },
+        {
+          "expr": "sum(rate(kafka_producer_topic_record_send_total{application=\"travel-agency-query-side\", topic=~\".*DLT.*|.*dlt.*\"}[1m])) by (topic)",
+          "legendFormat": "produced → {{topic}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 50, "spanNulls": true },
+          "unit": "ops",
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["travel-agency", "kafka", "query-side"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "prometheus" },
+        "hide": 2,
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Query Side — Kafka Messaging",
+  "uid": "kafka-messaging-query-side"
+}

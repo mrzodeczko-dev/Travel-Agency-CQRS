@@ -1,0 +1,119 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Request Throughput by Endpoint",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"travel-agency-command-side\", uri!~\"/actuator.*\"}[1m])) by (method, uri)",
+          "legendFormat": "{{method}} {{uri}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "spanNulls": true, "lineWidth": 2 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "title": "Request Duration by Endpoint (p95) — click data point to view trace",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"travel-agency-command-side\", uri!~\"/actuator.*\"}[1m])) by (le, method, uri))",
+          "legendFormat": "{{method}} {{uri}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "exemplarTraceIdDestinations": [
+            {
+              "name": "trace_id",
+              "datasourceUid": "tempo"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "spanNulls": true },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "title": "Request Duration by Endpoint (p50 vs p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{application=\"travel-agency-command-side\", uri!~\"/actuator.*\"}[1m])) by (le, uri))",
+          "legendFormat": "p50 {{uri}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"travel-agency-command-side\", uri!~\"/actuator.*\"}[1m])) by (le, uri))",
+          "legendFormat": "p99 {{uri}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 5, "spanNulls": true },
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Slow Requests (> 1s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"travel-agency-command-side\", uri!~\"/actuator.*\"}[1m])) by (uri) - sum(rate(http_server_requests_seconds_bucket{application=\"travel-agency-command-side\", uri!~\"/actuator.*\", le=\"1.0\"}[1m])) by (uri)",
+          "legendFormat": "{{uri}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 30, "spanNulls": true },
+          "unit": "reqps",
+          "color": { "mode": "fixed", "fixedColor": "orange" }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["travel-agency", "tracing", "command-side"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "Prometheus", "value": "prometheus" },
+        "hide": 2,
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Command Side - Requests stats",
+  "uid": "requests-stats-command-side"
+}

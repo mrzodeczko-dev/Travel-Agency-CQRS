@@ -11,6 +11,65 @@
       "name": "COMMAND SIDE",
       "item": [
         {
+          "name": "CREATE HOTEL",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"capacity\": 100\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/hotels",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "hotels"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "UPDATE HOTEL CAPACITY",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"capacity\": 150\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/hotels/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "hotels",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "CREATE BOOKING",
           "request": {
             "method": "POST",
@@ -65,6 +124,27 @@
     {
       "name": "QUERY SIDE",
       "item": [
+        {
+          "name": "GET HOTEL CAPACITY",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/api/hotels/1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8081",
+              "path": [
+                "api",
+                "hotels",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
         {
           "name": "GET AVAILABILITY",
           "request": {

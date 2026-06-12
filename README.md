@@ -1,11 +1,13 @@
 # Travel Agency — CQRS (Orchestration)
 
-[![Java](https://img.shields.io/badge/Java-25-ED8B00.svg)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.6-6DB33F.svg)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-25-ED8B00.svg)](https://openjdk.org/)
 [![Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-black.svg)](https://kafka.apache.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-336791.svg)](https://www.postgresql.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-8-green.svg)](https://www.mongodb.com/)
 [![Docker](https://img.shields.io/badge/Docker%20Compose-Ready-blue.svg)](https://www.docker.com/)
+[![Grafana](https://img.shields.io/badge/Grafana-11.1-F46800.svg)](https://grafana.com/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-2.53-E6522C.svg)](https://prometheus.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 <a id="toc"></a>
@@ -16,6 +18,7 @@
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
 - [Services & Ports](#services-and-ports)
+- [Observability](#observability)
 - [API Endpoints](#api-endpoints)
 - [Kafka Topics](#kafka-topics)
 - [Environment Variables](#environment-variables)
@@ -57,7 +60,7 @@ The system implements **Command Query Responsibility Segregation (CQRS)** with *
 ```mermaid
 flowchart LR
     subgraph cmd["Command Side :8080"]
-        API_C["REST API\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
+        API_C["REST API\nPOST/PUT /api/hotels\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
         PG[("PostgreSQL")]
         OB["Outbox Scheduler"]
     end
@@ -73,13 +76,14 @@ flowchart LR
         KS["Kafka Streams\nBookingStreamsTopology"]
         APL["AvailabilityProjectionListener"]
         HCL["HotelCapacityListener"]
-        API_Q["REST API\nGET /api/availability/{hotelId}"]
+        API_Q["REST API\nGET /api/availability/{hotelId}\nGET /api/hotels/{hotelId}"]
         MDB[("MongoDB")]
     end
 
     API_C --> PG
     PG --> OB
     OB -->|BookingEventAvro| TB
+    OB -->|HotelUpsertedAvro| TH
     TB --> KS
     KS -->|AvailabilityUpdated| TA
     TA --> APL --> MDB
@@ -91,12 +95,13 @@ flowchart LR
 
 **Data flow:**
 
-1. Client sends a booking command (`POST` or `DELETE`) to the Command Side
-2. Command Side persists the booking in PostgreSQL and saves an outbox entry in the same transaction (Transactional Outbox Pattern)
-3. Outbox Scheduler polls and publishes `BookingEventAvro` events (with `EventType`: `BookingCreated` / `BookingCancelled`) to the `travel.bookings` Kafka topic
+1. Client creates hotels (`POST /api/hotels`) and bookings (`POST` / `DELETE /api/bookings`) on the Command Side
+2. Command Side persists the entity in PostgreSQL and saves an outbox entry in the same transaction (Transactional Outbox Pattern)
+3. Outbox Scheduler polls and publishes events to Kafka: `BookingEventAvro` → `travel.bookings`, `HotelUpsertedAvro` → `travel.hotels`
 4. Query Side's Kafka Streams topology consumes booking events, computes per-hotel per-day occupancy deltas, and emits `AvailabilityUpdated` events to the `travel.availability` topic
-5. Availability Projection Listener upserts the read model in MongoDB with current occupancy, capacity, and availability status (`AVAILABLE` / `LAST_ROOMS` / `SOLD_OUT`)
-6. Client queries availability via the Query Side REST API, which reads directly from MongoDB
+5. Hotel Capacity Listener consumes `HotelUpserted` events and updates hotel capacity in MongoDB
+6. Availability Projection Listener upserts the read model in MongoDB with current occupancy, capacity, and availability status (`AVAILABLE` / `LAST_ROOMS` / `SOLD_OUT`)
+7. Client queries availability via the Query Side REST API, which reads directly from MongoDB
 
 ---
 
@@ -165,6 +170,45 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 | Kafka UI | `kafka-ui` | `8100` | Web interface for Kafka monitoring |
 | Liquibase (MongoDB) | `liquibase-mongo` | — | Runs MongoDB migrations and exits |
 | Kafka Init | `kafka-init` | — | Creates Kafka topics and exits |
+| Prometheus | `prometheus` | `9090` | Metrics collection and storage |
+| Grafana | `grafana` | `3000` | Dashboards and observability UI |
+
+---
+
+<a id="observability"></a>
+## Observability
+
+[↑ Back to top](#toc)
+
+The stack includes **Prometheus** for metrics scraping and **Grafana** for dashboards and visualization.
+
+Grafana starts with anonymous access enabled (Viewer role) — no login required to browse dashboards. Admin credentials: `admin` / `admin`.
+
+### Grafana Dashboards
+
+All dashboards are provisioned automatically from `observability/grafana/dashboards/` and are available at [http://localhost:3000](http://localhost:3000).
+
+#### Command Side
+
+| Dashboard | URL | Description |
+|-----------|-----|-------------|
+| Application Overview | [localhost:3000/d/application-overview-command-side](http://localhost:3000/d/application-overview-command-side) | JVM metrics, HTTP throughput, error rates |
+| Booking Service | [localhost:3000/d/booking-service](http://localhost:3000/d/booking-service) | Booking creation and cancellation metrics |
+| Hotels Service | [localhost:3000/d/hotels-service](http://localhost:3000/d/hotels-service) | Hotel CRUD operation metrics |
+| Kafka Producer | [localhost:3000/d/kafka-producer](http://localhost:3000/d/kafka-producer) | Outbox publish rates, producer latency |
+| Request Stats | [localhost:3000/d/requests-stats-command-side](http://localhost:3000/d/requests-stats-command-side) | HTTP request latencies, status codes |
+
+#### Query Side
+
+| Dashboard | URL | Description |
+|-----------|-----|-------------|
+| Application Overview | [localhost:3000/d/application-overview-query-side](http://localhost:3000/d/application-overview-query-side) | JVM metrics, HTTP throughput, error rates |
+| Kafka Messaging | [localhost:3000/d/kafka-messaging-query-side](http://localhost:3000/d/kafka-messaging-query-side) | Consumer lag, Kafka Streams processing rates |
+| Request Stats | [localhost:3000/d/requests-stats-query-side](http://localhost:3000/d/requests-stats-query-side) | HTTP request latencies, status codes |
+
+### Other UIs
+
+- **Prometheus**: [http://localhost:9090](http://localhost:9090) — raw metrics, PromQL queries
 
 ---
 
@@ -177,6 +221,8 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 
 | Method | Path | Description | Request Body | Success | Errors |
 |--------|------|-------------|--------------|---------|--------|
+| `POST` | `/api/hotels` | Create a hotel | `{ capacity }` | `201 Created` | `400` |
+| `PUT` | `/api/hotels/{id}` | Update hotel capacity | `{ capacity }` | `200 OK` | `400` |
 | `POST` | `/api/bookings` | Create a booking | `{ hotelId, userId, start, end }` | `201 Created` | `400`, `409` |
 | `DELETE` | `/api/bookings/{id}` | Cancel a booking | — | `204 No Content` | `404`, `409` |
 
@@ -185,10 +231,23 @@ docker compose down -v       # stop containers, remove volumes (clean state)
 | Method | Path | Description | Query Params | Success | Errors |
 |--------|------|-------------|--------------|---------|--------|
 | `GET` | `/api/availability/{hotelId}` | Get hotel availability | `from`, `to` (ISO dates, optional) | `200 OK` | `400` |
+| `GET` | `/api/hotels/{hotelId}` | Get hotel capacity | — | `200 OK` | `404` |
+
+### Swagger UI
+
+Both services expose interactive API documentation via springdoc-openapi:
+
+- Command Side: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- Query Side: [http://localhost:8081/swagger-ui.html](http://localhost:8081/swagger-ui.html)
 
 ### cURL examples
 
 ```bash
+# Create a hotel
+curl -X POST http://localhost:8080/api/hotels \
+  -H "Content-Type: application/json" \
+  -d '{"capacity": 100}'
+
 # Create a booking
 curl -X POST http://localhost:8080/api/bookings \
   -H "Content-Type: application/json" \
@@ -272,9 +331,12 @@ Copy `.env.example` to `.env` and adjust as needed. All variables are documented
 
 A ready-to-use Postman collection is included in `postman/Travel-Agency-CQRS.postman_collection.json` covering the full booking flow:
 
-1. **Create Booking** — `POST /api/bookings` (Command Side)
-2. **Cancel Booking** — `DELETE /api/bookings/{id}` (Command Side)
-3. **Get Availability** — `GET /api/availability/{hotelId}` (Query Side)
+1. **Create Hotel** — `POST /api/hotels` (Command Side)
+2. **Update Hotel Capacity** — `PUT /api/hotels/{id}` (Command Side)
+3. **Create Booking** — `POST /api/bookings` (Command Side)
+4. **Cancel Booking** — `DELETE /api/bookings/{id}` (Command Side)
+5. **Get Hotel Capacity** — `GET /api/hotels/{hotelId}` (Query Side)
+6. **Get Availability** — `GET /api/availability/{hotelId}` (Query Side)
 
 Import via **File → Import** in Postman.
 
@@ -287,14 +349,16 @@ Import via **File → Import** in Postman.
 
 The `e2e/` directory is a standalone Maven project with JUnit 5 + RestAssured + Awaitility tests that run against the live stack. They verify the full CQRS pipeline end-to-end — no application source code needed.
 
+Test data is managed automatically: `HotelSeeder` creates hotels via the command side REST API (`POST /api/hotels`) and waits for them to propagate to the query side, exercising the full CQRS pipeline. `DatabaseCleaner` truncates PostgreSQL tables, restarts sequences, and drops MongoDB collections after each test run. Database credentials are read from the project's `.env` file.
+
 ### What is tested
 
 | Test class | Scenarios |
 |------------|-----------|
 | `HealthCheckTest` | Both services respond `200` on `/actuator/health` |
-| `BookingFlowTest` | Create booking (`201`), availability projection appears on query side, cancel (`204`), double cancel (`409`), occupancy decreases after cancellation, input validation (`400`, `404`), paged response shape |
+| `BookingFlowTest` | Hotel seeding via API, create booking (`201`), availability projection appears on query side, cancel (`204`), double cancel (`409`), occupancy decreases after cancellation, input validation (`400`, `404`), paged response shape, database cleanup |
 
-Availability assertions use Awaitility polling with a configurable timeout (default 30 s) to account for the asynchronous Kafka event pipeline.
+Availability assertions use Awaitility polling with a configurable timeout (default 120 s) to account for the asynchronous Kafka event pipeline with exactly-once semantics.
 
 ### Running the tests
 
@@ -313,7 +377,7 @@ mvn test
 |---------------------|-----------------|-------------|---------|
 | `COMMAND_SIDE_URL` | `command.side.url` | Base URL of the command side | `http://localhost:8080` |
 | `QUERY_SIDE_URL` | `query.side.url` | Base URL of the query side | `http://localhost:8081` |
-| `E2E_PROPAGATION_TIMEOUT` | `e2e.propagation.timeout` | Max seconds to wait for event propagation | `30` |
+| `E2E_PROPAGATION_TIMEOUT` | `e2e.propagation.timeout` | Max seconds to wait for event propagation | `120` |
 
 ```bash
 # Example: custom URLs
@@ -341,10 +405,30 @@ Travel-Agency-CQRS/
 │           ├── 001-availability-hotelId-date-compound-index.yaml
 │           ├── 002-availability-hotelId-index.yaml
 │           └── 003-hotels-capacity-index.yaml
+├── observability/                                      # Monitoring & tracing configuration
+│   ├── grafana/
+│   │   ├── dashboards/
+│   │   │   ├── command-side/
+│   │   │   │   ├── application-overview.json
+│   │   │   │   ├── booking-service.json
+│   │   │   │   ├── hotels-service.json
+│   │   │   │   ├── kafka-producer.json
+│   │   │   │   └── requests-stats.json
+│   │   │   └── query-side/
+│   │   │       ├── application-overview.json
+│   │   │       ├── kafka-messaging.json
+│   │   │       └── request-stats.json
+│   │   └── provisioning/
+│   │       ├── dashboards/dashboards.yml
+│   │       └── datasources/datasources.yml
+│   ├── prometheus/prometheus.yml
+│   └── tempo/tempo.yml
 ├── e2e/                                                # E2E smoke tests (Java / JUnit 5)
 │   ├── pom.xml                                         # Standalone Maven project
 │   └── src/test/java/com/rzodeczko/e2e/
 │       ├── E2EConfig.java                              # Shared configuration
+│       ├── HotelSeeder.java                            # Seeds hotels via REST API (full CQRS flow)
+│       ├── DatabaseCleaner.java                        # Truncates PostgreSQL + drops MongoDB collections
 │       ├── HealthCheckTest.java                        # Health check tests
 │       └── BookingFlowTest.java                        # Full CQRS flow tests
 ├── postman/                                            # Postman collection

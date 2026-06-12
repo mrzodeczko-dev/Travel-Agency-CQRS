@@ -5,10 +5,10 @@ services:
   # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   travel-agency-command-side-postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     volumes:
-      - travel-agency-command-side-postgres:/var/lib/postgresql/data
+      - travel-agency-command-side-postgres:/var/lib/postgresql
     environment:
       POSTGRES_DB: ${TA_COMMAND_SIDE_SERVICE_DB_NAME}
       POSTGRES_USER: ${TA_COMMAND_SIDE_SERVICE_DB_USER}
@@ -173,7 +173,7 @@ services:
   # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   travel-agency-command-side:
-    image: mrzodeczko/travel-agency-command-side:1.0.1
+    image: mrzodeczko/travel-agency-command-side:3.0.2
     restart: on-failure:10
     ports:
       - "${TA_COMMAND_SIDE_SERVICE_PORT}:8080"
@@ -193,6 +193,11 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${TA_COMMAND_SIDE_SERVICE_DB_PASSWORD}
       SERVER_PORT: ${TA_COMMAND_SIDE_SERVICE_PORT}
       TOPIC_BOOKINGS: ${TOPIC_BOOKINGS}
+      TOPIC_HOTELS: ${TOPIC_HOTELS}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED}
+      TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      TRACING_SAMPLING: ${TRACING_SAMPLING:-1.0}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     deploy:
       resources:
         limits:
@@ -207,7 +212,7 @@ services:
       - mr-network
 
   travel-agency-query-side:
-    image: mrzodeczko/travel-agency-query-side:1.0.1
+    image: mrzodeczko/travel-agency-query-side:3.0.2
     restart: on-failure:10
     ports:
       - "${QUERY_SIDE_SERVICE_PORT}:8081"
@@ -216,6 +221,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      liquibase-mongo:
+        condition: service_completed_successfully
       kafka:
         condition: service_healthy
       schema-registry:
@@ -240,6 +247,11 @@ services:
       TOPIC_HOTELS: ${TOPIC_HOTELS}
       TOPIC_HOTELS_DLT: ${TOPIC_HOTELS_DLT}
       LAST_ROOMS_THRESHOLD: ${QUERY_SIDE_LAST_ROOMS_THRESHOLD}
+      SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED}
+      TRACING_ENABLED: ${TRACING_ENABLED:-false}
+      TRACING_SAMPLING: ${TRACING_SAMPLING:-1.0}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+
     deploy:
       resources:
         limits:
@@ -253,11 +265,74 @@ services:
     networks:
       - mr-network
 
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+  # OBSERVABILITY
+  # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-remote-write-receiver'
+    depends_on:
+      travel-agency-command-side:
+        condition: service_started
+      travel-agency-query-side:
+        condition: service_started
+    networks:
+      - mr-network
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    command: [ "-config.file=/etc/tempo/tempo.yml" ]
+    depends_on:
+      - prometheus
+    networks:
+      - mr-network
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    depends_on:
+      - prometheus
+      - tempo
+    networks:
+      - mr-network
+
 volumes:
   travel-agency-command-side-postgres:
   mongodb:
   kafka-data:
   kafka-streams-state:
+  prometheus-data:
+  tempo-data:
+  grafana-data:
 
 networks:
   mr-network:

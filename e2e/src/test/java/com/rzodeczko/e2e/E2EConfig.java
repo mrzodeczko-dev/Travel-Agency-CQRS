@@ -17,14 +17,6 @@ public final class E2EConfig {
             resolve("e2e.propagation.timeout", "E2E_PROPAGATION_TIMEOUT", "120")
     );
 
-    public static final String POSTGRES_URL = resolve("postgres.url", "POSTGRES_URL",
-            "jdbc:postgresql://localhost:5432/travels_db");
-    public static final String POSTGRES_USER = resolve("postgres.user", "POSTGRES_USER", "user");
-    public static final String POSTGRES_PASSWORD = resolve("postgres.password", "POSTGRES_PASSWORD", "user1234");
-
-    public static final String MONGO_URI = resolve("mongo.uri", "MONGO_URI",
-            "mongodb://user:user1234@localhost:27017/travels_read_db?authSource=admin");
-
     private E2EConfig() {
     }
 

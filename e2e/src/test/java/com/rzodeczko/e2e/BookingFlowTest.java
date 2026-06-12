@@ -1,7 +1,6 @@
 package com.rzodeczko.e2e;
 
 import io.restassured.http.ContentType;
-import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 
 import java.time.Duration;
@@ -31,8 +30,9 @@ public class BookingFlowTest {
 
     @BeforeAll
     static void seedTestData() {
-        DatabaseSeeder.seedHotels();
+        HotelSeeder.seedHotels();
     }
+
 
 
     @Test
@@ -42,7 +42,7 @@ public class BookingFlowTest {
         given()
                 .baseUri(E2EConfig.COMMAND_SIDE_URL)
                 .contentType(ContentType.JSON)
-                .body(booking(1, 100, "2027-01-10", "2027-01-12"))
+                .body(booking(HotelSeeder.getHotelId(0), 100, "2027-01-10", "2027-01-12"))
                 .when()
                 .post("/api/bookings")
                 .then()
@@ -53,9 +53,9 @@ public class BookingFlowTest {
 
     @Test
     @Order(2)
-    @DisplayName("Full booking lifecycle: create → propagation → cancel → propagation")
+    @DisplayName("Full booking lifecycle: create -> propagation -> cancel -> propagation")
     void fullBookingLifecycle() {
-        int hotelId = 2;
+        int hotelId = HotelSeeder.getHotelId(1);
 
         // 1. Create booking
         int bookingId = createBooking(hotelId, 101, "2027-02-01", "2027-02-03");
@@ -111,7 +111,7 @@ public class BookingFlowTest {
     @Order(3)
     @DisplayName("DELETE /api/bookings/{id} returns 204")
     void cancelBookingReturns204() {
-        int bookingId = createBooking(3, 102, "2027-03-01", "2027-03-02");
+        int bookingId = createBooking(HotelSeeder.getHotelId(2), 102, "2027-03-01", "2027-03-02");
 
         given()
                 .baseUri(E2EConfig.COMMAND_SIDE_URL)
@@ -125,7 +125,7 @@ public class BookingFlowTest {
     @Order(4)
     @DisplayName("Double cancel returns 409 Conflict")
     void doubleCancelReturns409() {
-        int bookingId = createBooking(4, 103, "2027-04-01", "2027-04-02");
+        int bookingId = createBooking(HotelSeeder.getHotelId(3), 103, "2027-04-01", "2027-04-02");
 
         // First cancel
         given()
@@ -178,7 +178,7 @@ public class BookingFlowTest {
                 .queryParam("from", "2027-06-10")
                 .queryParam("to", "2027-06-01")
                 .when()
-                .get("/api/availability/1")
+                .get("/api/availability/" + HotelSeeder.getHotelId(0))
                 .then()
                 .statusCode(400);
     }

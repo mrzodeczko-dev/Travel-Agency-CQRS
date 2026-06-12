@@ -23,7 +23,7 @@
 - [API Endpoints](#api-endpoints)
 - [Kafka Topics](#kafka-topics)
 - [Environment Variables](#environment-variables)
-- [E2E Smoke Tests](#e2e-tests)
+- [E2E Tests](#e2e-tests)
 - [Project Structure](#project-structure)
 - [Contact](#contact)
 
@@ -58,26 +58,29 @@ The system implements **Command Query Responsibility Segregation (CQRS)** with *
 [↑ Back to top](#toc)
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph cmd["Command Side :8080"]
+        direction LR
         API_C["REST API\nPOST/PUT /api/hotels\nPOST /api/bookings\nDELETE /api/bookings/{id}"]
         PG[("PostgreSQL")]
         OB["Outbox Scheduler"]
     end
 
-    subgraph kafka["Kafka (KRaft)"]
+    subgraph kafka["Kafka · KRaft"]
+        direction LR
+        SR["Schema Registry\nAvro"]
         TB(["travel.bookings"])
         TA(["travel.availability"])
         TH(["travel.hotels"])
-        SR["Schema Registry\nAvro"]
     end
 
     subgraph query["Query Side :8081"]
+        direction LR
         KS["Kafka Streams\nBookingStreamsTopology"]
         APL["AvailabilityProjectionListener"]
         HCL["HotelCapacityListener"]
-        API_Q["REST API\nGET /api/availability/{hotelId}\nGET /api/hotels/{hotelId}"]
         MDB[("MongoDB")]
+        API_Q["REST API\nGET /api/availability/{hotelId}\nGET /api/hotels/{hotelId}"]
     end
 
     API_C --> PG
@@ -91,6 +94,11 @@ flowchart LR
     MDB --> API_Q
     SR -.->|schema validation| TB
     SR -.->|schema validation| TA
+    SR -.->|schema validation| TH
+
+    style cmd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    style kafka fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#bf360c
+    style query fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
 ```
 
 **Data flow:**
@@ -336,7 +344,7 @@ Copy `.env.example` to `.env` and adjust as needed. All variables are documented
 ---
 
 <a id="e2e-tests"></a>
-## E2E Smoke Tests
+## E2E Tests
 
 [↑ Back to top](#toc)
 
@@ -415,7 +423,7 @@ Travel-Agency-CQRS/
 │   │       ├── dashboards/dashboards.yml
 │   │       └── datasources/datasources.yml
 │   └── prometheus/prometheus.yml
-├── e2e/                                                # E2E smoke tests (Java / JUnit 5)
+├── e2e/                                                # E2E tests (Java / JUnit 5)
 │   ├── pom.xml                                         # Standalone Maven project
 │   └── src/test/java/com/rzodeczko/e2e/
 │       ├── E2EConfig.java                              # Shared configuration

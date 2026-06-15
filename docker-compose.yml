@@ -174,7 +174,7 @@ services:
   # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   travel-agency-command-side:
-    image: mrzodeczko/travel-agency-command-side:3.0.2
+    image: mrzodeczko/travel-agency-command-side:3.0.3
     restart: on-failure:10
     ports:
       - "${TA_COMMAND_SIDE_SERVICE_PORT}:8080"
@@ -198,7 +198,6 @@ services:
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED}
       TRACING_ENABLED: ${TRACING_ENABLED:-false}
       TRACING_SAMPLING: ${TRACING_SAMPLING:-1.0}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     deploy:
       resources:
         limits:
@@ -251,7 +250,6 @@ services:
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED}
       TRACING_ENABLED: ${TRACING_ENABLED:-false}
       TRACING_SAMPLING: ${TRACING_SAMPLING:-1.0}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
 
     deploy:
       resources:
@@ -290,21 +288,6 @@ services:
     networks:
       - mr-network
 
-  tempo:
-    image: grafana/tempo:2.5.0
-    container_name: tempo
-    volumes:
-      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
-      - tempo-data:/var/tempo
-    ports:
-      - "3200:3200"
-      - "4317:4317"
-      - "4318:4318"
-    command: [ "-config.file=/etc/tempo/tempo.yml" ]
-    depends_on:
-      - prometheus
-    networks:
-      - mr-network
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -322,7 +305,6 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     depends_on:
       - prometheus
-      - tempo
     networks:
       - mr-network
 
@@ -332,7 +314,6 @@ volumes:
   kafka-data:
   kafka-streams-state:
   prometheus-data:
-  tempo-data:
   grafana-data:
 
 networks:

@@ -164,18 +164,42 @@
       }
     },
     {
-      "title": "Scheduled Task Execution Duration (outbox schedulers)",
+      "title": "Scheduled Task Execution Duration — SUCCESS",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
       "targets": [
         {
-          "expr": "rate(tasks_scheduled_execution_seconds_sum[5m]) / rate(tasks_scheduled_execution_seconds_count[5m])",
+          "expr": "rate(tasks_scheduled_execution_seconds_sum{outcome=\"SUCCESS\"}[5m]) / rate(tasks_scheduled_execution_seconds_count{outcome=\"SUCCESS\"}[5m])",
           "legendFormat": "avg {{code_function}} ({{code_namespace}})",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
         },
         {
-          "expr": "tasks_scheduled_execution_seconds_max",
+          "expr": "tasks_scheduled_execution_seconds_max{outcome=\"SUCCESS\"}",
           "legendFormat": "max {{code_function}} ({{code_namespace}})",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "spanNulls": true }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Scheduled Task Execution Duration — ERROR",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "expr": "rate(tasks_scheduled_execution_seconds_sum{outcome=\"ERROR\"}[5m]) / rate(tasks_scheduled_execution_seconds_count{outcome=\"ERROR\"}[5m])",
+          "legendFormat": "avg {{code_function}} ({{code_namespace}}) [{{error}}]",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        },
+        {
+          "expr": "tasks_scheduled_execution_seconds_max{outcome=\"ERROR\"}",
+          "legendFormat": "max {{code_function}} ({{code_namespace}}) [{{error}}]",
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
         }
       ],
@@ -202,6 +226,6 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "title": "Travel Agency -Kafka & Outbox",
+  "title": "Travel Agency Command side — Kafka & Outbox",
   "uid": "kafka-producer"
 }

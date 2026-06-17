@@ -174,7 +174,7 @@ services:
   # ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   travel-agency-command-side:
-    image: mrzodeczko/travel-agency-command-side:3.0.3
+    image: mrzodeczko/travel-agency-command-side:3.0.5
     restart: on-failure:10
     ports:
       - "${TA_COMMAND_SIDE_SERVICE_PORT}:8080"
@@ -212,7 +212,7 @@ services:
       - mr-network
 
   travel-agency-query-side:
-    image: mrzodeczko/travel-agency-query-side:3.0.2
+    image: mrzodeczko/travel-agency-query-side:3.0.5
     restart: on-failure:10
     ports:
       - "${QUERY_SIDE_SERVICE_PORT}:8081"
